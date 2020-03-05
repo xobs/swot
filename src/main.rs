@@ -1,0 +1,12 @@
+
+/*
+#define FT_LIST_NUMBER_ONLY			0x80000000
+#define FT_LIST_BY_INDEX			0x40000000
+#define FT_LIST_ALL					0x20000000
+
+#define FT_LIST_MASK (FT_LIST_NUMBER_ONLY|FT_LIST_BY_INDEX|FT_LIST_ALL)
+*/
+
+
+fn main() {
+}

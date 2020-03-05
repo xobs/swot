@@ -1,0 +1,1 @@
+cargo:rustc-link-search=native=lib/vcp-2.12.28/amd64
