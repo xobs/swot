@@ -2,8 +2,8 @@
 
 extern crate winapi;
 // use winapi::um::winnt::{PVOID, ULONG, DWORD};
-pub use winapi::shared::minwindef::{DWORD, LPDWORD, LPLONG, LPVOID};
-pub use winapi::shared::ntdef::{PVOID, ULONG, LONG};
+pub use winapi::shared::minwindef::{DWORD, LPDWORD, LPLONG, LPVOID, UCHAR, PUCHAR};
+pub use winapi::shared::ntdef::{LONG, PVOID, ULONG};
 
 #[allow(non_camel_case_types)]
 pub type FT_HANDLE = PVOID;
@@ -88,6 +88,20 @@ extern "stdcall" {
     pub fn FT_Open(deviceNumber: u32, pHandle: *mut FT_HANDLE) -> FT_STATUS;
     pub fn FT_OpenEx(pArg1: PVOID, Flags: DWORD, pHandle: *mut FT_HANDLE) -> FT_STATUS;
     pub fn FT_Close(ftHandle: FT_HANDLE) -> FT_STATUS;
+    pub fn FT_Write(
+        ftHandle: FT_HANDLE,
+        lpBuffer: LPVOID,
+        dwBytesToWrite: DWORD,
+        lpBytesWritten: LPDWORD,
+    ) -> FT_STATUS;
+    pub fn FT_Read(
+        ftHandle: FT_HANDLE,
+        lpBuffer: LPVOID,
+        dwBytesToRead: DWORD,
+        lpBytesReturned: LPDWORD,
+    ) -> FT_STATUS;
+    pub fn FT_SetBitMode(ftHandle: FT_HANDLE, ucMask: UCHAR, ucEnable: UCHAR) -> FT_STATUS;
+    pub fn FT_GetBitMode(ftHandle: FT_HANDLE, pucMode: PUCHAR) -> FT_STATUS;
 }
 
 pub fn create_device_info_list() -> Result<usize, usize> {
