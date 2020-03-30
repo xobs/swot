@@ -6,9 +6,9 @@ pub use winapi::shared::minwindef::{DWORD, LPDWORD, LPLONG, LPVOID};
 pub use winapi::shared::ntdef::{PVOID, ULONG, LONG};
 
 #[allow(non_camel_case_types)]
-type FT_HANDLE = PVOID;
+pub type FT_HANDLE = PVOID;
 #[allow(non_camel_case_types)]
-type FT_STATUS = ULONG;
+pub type FT_STATUS = ULONG;
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -68,13 +68,13 @@ pub const FT_LIST_MASK: DWORD = (FT_LIST_NUMBER_ONLY | FT_LIST_BY_INDEX | FT_LIS
 #[allow(non_snake_case)]
 #[allow(dead_code)]
 extern "stdcall" {
-    fn FT_ListDevices(pArg1: PVOID, pArg2: PVOID, Flags: DWORD) -> FT_STATUS;
-    fn FT_CreateDeviceInfoList(lpdwNumDevs: LPDWORD) -> FT_STATUS;
-    fn FT_GetDeviceInfoList(
+    pub fn FT_ListDevices(pArg1: PVOID, pArg2: PVOID, Flags: DWORD) -> FT_STATUS;
+    pub fn FT_CreateDeviceInfoList(lpdwNumDevs: LPDWORD) -> FT_STATUS;
+    pub fn FT_GetDeviceInfoList(
         pDest: *mut FT_DEVICE_LIST_INFO_NODE,
         lpdwNumDevs: LPDWORD,
     ) -> FT_STATUS;
-    fn FT_GetDeviceInfoDetail(
+    pub fn FT_GetDeviceInfoDetail(
         dwIndex: DWORD,
         lpdwFlags: LPDWORD,
         lpdwType: LPDWORD,
@@ -84,10 +84,10 @@ extern "stdcall" {
         lpDescription: LPVOID,
         pftHandle: *mut FT_HANDLE,
     ) -> FT_STATUS;
-    fn FT_GetComPortNumber(ftHandle: FT_HANDLE, lpdwComPortNumber: LPLONG) -> FT_STATUS;
-    fn FT_Open(deviceNumber: u32, pHandle: *mut FT_HANDLE) -> FT_STATUS;
-    fn FT_OpenEx(pArg1: PVOID, Flags: DWORD, pHandle: *mut FT_HANDLE) -> FT_STATUS;
-    fn FT_Close(ftHandle: FT_HANDLE) -> FT_STATUS;
+    pub fn FT_GetComPortNumber(ftHandle: FT_HANDLE, lpdwComPortNumber: LPLONG) -> FT_STATUS;
+    pub fn FT_Open(deviceNumber: u32, pHandle: *mut FT_HANDLE) -> FT_STATUS;
+    pub fn FT_OpenEx(pArg1: PVOID, Flags: DWORD, pHandle: *mut FT_HANDLE) -> FT_STATUS;
+    pub fn FT_Close(ftHandle: FT_HANDLE) -> FT_STATUS;
 }
 
 pub fn create_device_info_list() -> Result<usize, usize> {
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn open_device() {
-        let desc = b"Lattice FTUSB Interface Cable B\0";
+        let desc = b"iCEBreaker V1.0e B\0";
         let mut handle = 0 as FT_HANDLE;
         let result = unsafe {
             FT_OpenEx(
