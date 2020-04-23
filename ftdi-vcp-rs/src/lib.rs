@@ -1,11 +1,12 @@
 use ftdi_vcp_sys::{
-    FT_Close, FT_GetBitMode, FT_GetComPortNumber, FT_OpenEx, FT_SetBitMode, FT_Write, DWORD,
-    FT_HANDLE, FT_OPEN_BY_DESCRIPTION, FT_STATUS, LONG, LPDWORD, LPVOID, PVOID, UCHAR,
+    FT_Close, FT_GetBitMode, FT_GetComPortNumber, FT_OpenEx, FT_Purge, FT_ResetDevice,
+    FT_SetBitMode, FT_Write, DWORD, FT_HANDLE, FT_OPEN_BY_DESCRIPTION, FT_STATUS, LONG, LPDWORD,
+    LPVOID, PVOID, UCHAR,
 };
 use std::convert::TryInto;
 use std::ffi::CString;
-use std::mem::MaybeUninit;
 use std::io::{Read, Write};
+use std::mem::MaybeUninit;
 
 #[derive(Debug)]
 pub enum BitMode {
@@ -77,6 +78,10 @@ pub enum Error {
     OtherError,
     DeviceListNotReady,
     NoComPortAssigned,
+
+    /// The provided string contained at least one NULL byte
+    StringContainsNullByte,
+
     // UnknownBitMode(u8),
     UnknownError(FT_STATUS),
 }
@@ -124,7 +129,7 @@ pub struct VCP {
 
 impl VCP {
     pub fn new_from_name(name: &str) -> Result<VCP, Error> {
-        let c_str = CString::new(name).expect("string already contained null bytes");
+        let c_str = CString::new(name).or(Err(Error::StringContainsNullByte))?;
         let mut handle = MaybeUninit::<FT_HANDLE>::uninit();
         let result = Error::from(unsafe {
             FT_OpenEx(
@@ -165,9 +170,30 @@ impl VCP {
     }
 
     /// Set the given signals to "OUTPUT".  All other signals will be "INPUT".
-    pub fn set_bit_mode(&mut self, outputs: u8) -> Result<(), Error> {
+    pub fn set_bitmode(&mut self, outputs: u8, bitmode: BitMode) -> Result<(), Error> {
+        let result = Error::from(unsafe { FT_SetBitMode(self.handle, outputs, bitmode.to_u8()) });
+        if result != Error::NoError {
+            Err(result)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn reset(&mut self) -> Result<(), Error> {
+        let result = Error::from(unsafe { FT_ResetDevice(self.handle) });
+        if result != Error::NoError {
+            Err(result)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn purge(&mut self) -> Result<(), Error> {
         let result = Error::from(unsafe {
-            FT_SetBitMode(self.handle, outputs, BitMode::SyncBitbang.to_u8())
+            FT_Purge(
+                self.handle,
+                ftdi_vcp_sys::FT_PURGE_RX | ftdi_vcp_sys::FT_PURGE_TX,
+            )
         });
         if result != Error::NoError {
             Err(result)
@@ -206,8 +232,7 @@ impl Write for VCP {
             FT_Write(
                 self.handle,
                 buf.as_ptr() as LPVOID,
-                buf
-                    .len()
+                buf.len()
                     .try_into()
                     .expect("couldn't convert buffer length to DWORD"),
                 bytes_written.as_mut_ptr() as LPDWORD,

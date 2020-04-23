@@ -2,7 +2,7 @@
 
 extern crate winapi;
 // use winapi::um::winnt::{PVOID, ULONG, DWORD};
-pub use winapi::shared::minwindef::{DWORD, LPDWORD, LPLONG, LPVOID, UCHAR, PUCHAR};
+pub use winapi::shared::minwindef::{BOOL, DWORD, LPDWORD, LPLONG, LPVOID, PUCHAR, UCHAR};
 pub use winapi::shared::ntdef::{LONG, PVOID, ULONG};
 
 #[allow(non_camel_case_types)]
@@ -54,13 +54,19 @@ pub enum FtStatus {
 //     FT_FLAGS_HISPEED = 2,
 // }
 
+//
+// Purge rx and tx buffers
+//
+pub const FT_PURGE_RX: DWORD = 1;
+pub const FT_PURGE_TX: DWORD = 2;
+
 pub const FT_OPEN_BY_SERIAL_NUMBER: DWORD = 1;
 pub const FT_OPEN_BY_DESCRIPTION: DWORD = 2;
 pub const FT_OPEN_BY_LOCATION: DWORD = 4;
 
-pub const FT_LIST_NUMBER_ONLY: DWORD = 0x80000000;
-pub const FT_LIST_BY_INDEX: DWORD = 0x40000000;
-pub const FT_LIST_ALL: DWORD = 0x20000000;
+pub const FT_LIST_NUMBER_ONLY: DWORD = 0x8000_0000;
+pub const FT_LIST_BY_INDEX: DWORD = 0x4000_0000;
+pub const FT_LIST_ALL: DWORD = 0x2000_0000;
 
 pub const FT_LIST_MASK: DWORD = (FT_LIST_NUMBER_ONLY | FT_LIST_BY_INDEX | FT_LIST_ALL);
 
@@ -102,6 +108,11 @@ extern "stdcall" {
     ) -> FT_STATUS;
     pub fn FT_SetBitMode(ftHandle: FT_HANDLE, ucMask: UCHAR, ucEnable: UCHAR) -> FT_STATUS;
     pub fn FT_GetBitMode(ftHandle: FT_HANDLE, pucMode: PUCHAR) -> FT_STATUS;
+    pub fn FT_SetLatencyTimer(ftHandle: FT_HANDLE, ucLatency: UCHAR) -> FT_STATUS;
+    pub fn FT_GetLatencyTimer(ftHandle: FT_HANDLE, pucLatency: PUCHAR) -> FT_STATUS;
+    pub fn FT_ResetDevice(ftHandle: FT_HANDLE) -> FT_STATUS;
+    pub fn FT_Purge(ftHandle: FT_HANDLE, dwMask: ULONG) -> FT_STATUS;
+    pub fn FT_W32_PurgeComm(ftHandle: FT_HANDLE, dwMask: DWORD) -> BOOL;
 }
 
 pub fn create_device_info_list() -> Result<usize, usize> {
@@ -165,7 +176,7 @@ mod tests {
             for ch in item.Description.iter() {
                 print!(" {:02x}", ch);
             }
-            println!("");
+            println!();
             println!("ftHandle: {:08x}", item.ftHandle as usize);
         }
     }
