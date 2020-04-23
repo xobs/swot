@@ -1,12 +1,14 @@
 use ftdi_vcp_sys::{
-    FT_Close, FT_GetBitMode, FT_GetComPortNumber, FT_OpenEx, FT_Purge, FT_ResetDevice,
-    FT_SetBitMode, FT_Write, DWORD, FT_HANDLE, FT_OPEN_BY_DESCRIPTION, FT_STATUS, LONG, LPDWORD,
-    LPVOID, PVOID, UCHAR,
+    FT_Close, FT_GetBitMode, FT_GetComPortNumber, FT_GetLatencyTimer, FT_OpenEx, FT_Purge, FT_Read,
+    FT_ResetDevice, FT_SetBitMode, FT_SetLatencyTimer, FT_Write, DWORD, FT_HANDLE,
+    FT_OPEN_BY_DESCRIPTION, FT_STATUS, LONG, LPDWORD, LPVOID, PVOID, UCHAR,
 };
 use std::convert::TryInto;
 use std::ffi::CString;
 use std::io::{Read, Write};
 use std::mem::MaybeUninit;
+
+pub mod mpsse;
 
 #[derive(Debug)]
 pub enum BitMode {
@@ -175,6 +177,7 @@ impl VCP {
         if result != Error::NoError {
             Err(result)
         } else {
+            self.bit_mode = bitmode;
             Ok(())
         }
     }
@@ -202,26 +205,125 @@ impl VCP {
         }
     }
 
-    pub fn write(&mut self, out_buffer: &[u8]) -> Result<usize, Error> {
-        let mut bytes_written = MaybeUninit::<DWORD>::uninit();
-        let result = Error::from(unsafe {
-            FT_Write(
-                self.handle,
-                out_buffer.as_ptr() as LPVOID,
-                out_buffer
-                    .len()
-                    .try_into()
-                    .expect("couldn't convert buffer length to DWORD"),
-                bytes_written.as_mut_ptr() as LPDWORD,
-            )
-        });
+    pub fn latency_timer(&mut self) -> Result<u8, Error> {
+        let mut latency = MaybeUninit::<UCHAR>::uninit();
+        let result = Error::from(unsafe { FT_GetLatencyTimer(self.handle, latency.as_mut_ptr()) });
         if result != Error::NoError {
             Err(result)
         } else {
-            Ok(unsafe { bytes_written.assume_init() }
-                .try_into()
-                .expect("invalid number of bytes written"))
+            Ok(unsafe { latency.assume_init() })
         }
+    }
+
+    pub fn set_latency_timer(&mut self, latency: u8) -> Result<(), Error> {
+        let result = Error::from(unsafe { FT_SetLatencyTimer(self.handle, latency) });
+        if result != Error::NoError {
+            Err(result)
+        } else {
+            Ok(())
+        }
+    }
+
+    // pub fn write(&mut self, out_buffer: &[u8]) -> Result<usize, Error> {
+    //     let mut bytes_written = MaybeUninit::<DWORD>::uninit();
+    //     let result = Error::from(unsafe {
+    //         FT_Write(
+    //             self.handle,
+    //             out_buffer.as_ptr() as LPVOID,
+    //             out_buffer
+    //                 .len()
+    //                 .try_into()
+    //                 .expect("couldn't convert buffer length to DWORD"),
+    //             bytes_written.as_mut_ptr() as LPDWORD,
+    //         )
+    //     });
+    //     if result != Error::NoError {
+    //         Err(result)
+    //     } else {
+    //         Ok(unsafe { bytes_written.assume_init() }
+    //             .try_into()
+    //             .expect("invalid number of bytes written"))
+    //     }
+    // }
+
+    pub fn set_gpio(&mut self, value: u8, direction: u8) -> Result<(), Error> {
+        match self.bit_mode {
+            BitMode::MPSSE => self
+                .write_all(&[mpsse::Command::MC_SETB_LOW.to_u8(), value, direction])
+                .or_else(|_| Err(Error::IoError)),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn readb_low(&mut self) -> Result<u8, Error> {
+        self.write_all(&[mpsse::Command::MC_READB_LOW.to_u8()])
+            .or_else(|_| Err(Error::IoError))?;
+        let mut result = [0; 1];
+        self.read(&mut result).or_else(|_| Err(Error::IoError))?;
+        Ok(result[0])
+    }
+
+    pub fn readb_high(&mut self) -> Result<u8, Error> {
+        self.write_all(&[mpsse::Command::MC_READB_HIGH.to_u8()])
+            .or_else(|_| Err(Error::IoError))?;
+        let mut result = [0; 1];
+        self.read(&mut result).or_else(|_| Err(Error::IoError))?;
+        Ok(result[0])
+    }
+
+    /// The purpose of this function is unclear.  It appears to send some number
+    /// of bits out the line.
+    pub fn xfer_spi_bits(&mut self, data: u8, bits: usize) -> Result<u8, Error> {
+        if bits < 1 {
+            return Ok(0);
+        }
+
+        let buffer = &[
+            /* Input and output, update data on negative edge read on positive, bits. */
+            0x20 /*MC_DATA_IN*/ | 0x10 /*MC_DATA_OUT*/ | 0x01 /*MC_DATA_OCN*/ | 0x02, /*MC_DATA_BITS*/
+            bits as u8 - 1,
+            data,
+        ];
+        self.write_all(buffer).or_else(|_| Err(Error::IoError))?;
+
+        let mut return_val = [0; 1];
+        self.read_exact(&mut return_val)
+            .or_else(|_| Err(Error::IoError))?;
+        Ok(return_val[0])
+    }
+
+    pub fn xfer_spi(&mut self, data: &mut [u8]) -> Result<(), Error> {
+        if data.is_empty() {
+            return Ok(());
+        }
+
+        /* Input and output, update data on negative edge read on positive. */
+        let buffer = &[
+            0x20 /*MC_DATA_IN*/ | 0x10 /*MC_DATA_OUT*/ | 0x01, /*MC_DATA_OCN*/
+            (data.len() - 1) as u8,
+            ((data.len() - 1) / 256) as u8,
+        ];
+        self.write_all(buffer).or_else(|_| Err(Error::IoError))?;
+        self.write_all(data).or_else(|_| Err(Error::IoError))?;
+
+        self.read_exact(data).or_else(|_| Err(Error::IoError))?;
+        Ok(())
+    }
+
+    pub fn send_spi(&mut self, data: &[u8]) -> Result<(), Error> {
+        if data.is_empty() {
+            return Ok(());
+        }
+
+        /* Input and output, update data on negative edge read on positive. */
+        let buffer = &[
+            0x10 /*MC_DATA_OUT*/ | 0x01, /*MC_DATA_OCN*/
+            (data.len() - 1) as u8,
+            ((data.len() - 1) / 256) as u8,
+        ];
+        self.write_all(buffer).or_else(|_| Err(Error::IoError))?;
+        self.write_all(data).or_else(|_| Err(Error::IoError))?;
+        Ok(())
     }
 }
 
@@ -241,7 +343,13 @@ impl Write for VCP {
         if result != Error::NoError {
             Err(std::io::Error::new(std::io::ErrorKind::Other, result))
         } else {
-            Ok(unsafe { bytes_written.assume_init() }
+            let bytes_written = unsafe { bytes_written.assume_init() };
+            // println!(
+            //     "Wrote {} bytes (wanted to write {})",
+            //     bytes_written,
+            //     buf.len()
+            // );
+            Ok(bytes_written
                 .try_into()
                 .expect("invalid number of bytes written"))
         }
@@ -253,19 +361,23 @@ impl Write for VCP {
 
 impl Read for VCP {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
-        let mut bytes_written = MaybeUninit::<DWORD>::uninit();
+        let mut bytes_read = MaybeUninit::<DWORD>::uninit();
         let result = Error::from(unsafe {
-            FT_Write(
+            FT_Read(
                 self.handle,
-                buf.as_ptr() as LPVOID,
-                1,
-                bytes_written.as_mut_ptr() as LPDWORD,
+                buf.as_mut_ptr() as LPVOID,
+                buf.len()
+                    .try_into()
+                    .expect("couldn't convert buffer length to DWORD"),
+                bytes_read.as_mut_ptr() as LPDWORD,
             )
         });
         if result != Error::NoError {
             Err(std::io::Error::new(std::io::ErrorKind::Other, result))
         } else {
-            Ok(unsafe { bytes_written.assume_init() }
+            let bytes_read = unsafe { bytes_read.assume_init() };
+            // println!("Read {} bytes (wanted to read {})", bytes_read, buf.len());
+            Ok(bytes_read
                 .try_into()
                 .expect("invalid number of bytes written"))
         }
