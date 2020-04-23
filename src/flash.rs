@@ -8,11 +8,16 @@ pub enum EraseType {
 
 pub struct Flash {
     pub vcp: VCP,
+    verbose: bool,
 }
 
 impl Flash {
     pub fn new(vcp: VCP) -> Flash {
-        Flash { vcp }
+        Flash { vcp, verbose: false }
+    }
+
+    pub fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
     }
 
     fn set_cs_creset(&mut self, cs_asserted: bool, reset_asserted: bool) -> Result<(), Error> {
@@ -64,7 +69,7 @@ impl Flash {
         Ok(())
     }
 
-    pub fn read_id(&mut self, verbose: bool) -> Result<(), Error> {
+    pub fn read_id(&mut self) -> Result<(), Error> {
         /* JEDEC ID structure:
          * Byte No. | Data Type
          * ---------+----------
@@ -78,7 +83,7 @@ impl Flash {
         data[0] = 0x9Fu8 /* FC_JEDECID - Read JEDEC ID */;
         let mut len = 5usize; // command + 4 response bytes
 
-        if verbose {
+        if self.verbose {
             println!("read flash ID..");
         }
 
@@ -127,10 +132,10 @@ impl Flash {
         }
     }
 
-    pub fn write_enable(&mut self, verbose: bool) -> Result<(), Error> {
-        if verbose {
+    pub fn write_enable(&mut self) -> Result<(), Error> {
+        if self.verbose {
             println!("status before enable:");
-            self.read_status(verbose)?;
+            self.read_status()?;
             println!("write enable..");
         }
 
@@ -139,9 +144,9 @@ impl Flash {
         self.vcp.xfer_spi(&mut data)?;
         self.chip_deselect()?;
 
-        if verbose {
+        if self.verbose {
             println!("status after enable:");
-            self.read_status(verbose)?;
+            self.read_status()?;
         }
         Ok(())
     }
@@ -168,14 +173,14 @@ impl Flash {
         Ok(())
     }
 
-    pub fn read_status(&mut self, verbose: bool) -> Result<u8, Error> {
+    pub fn read_status(&mut self) -> Result<u8, Error> {
         let mut data = [0x05 /* FC_RSR1 // Read Status Register 1 */, 0x00];
 
         self.chip_select()?;
         self.vcp.xfer_spi(&mut data)?;
         self.chip_deselect()?;
 
-        if verbose {
+        if self.verbose {
             println!("SR1: 0x{:02X}", data[1]);
             println!(
                 " - SPRL: {}",
@@ -251,7 +256,7 @@ impl Flash {
         self.vcp.xfer_spi(&mut data)?;
         self.chip_deselect()?;
 
-        self.wait(false)?;
+        self.wait()?;
 
         // Read Status Register 1
         data[0] = 0x05; // FC_RSR1;
@@ -270,8 +275,8 @@ impl Flash {
         Ok(())
     }
 
-    pub fn wait(&mut self, verbose: bool) -> Result<(), Error> {
-        if verbose {
+    pub fn wait(&mut self) -> Result<(), Error> {
+        if self.verbose {
             println!("waiting..");
         }
 
@@ -286,19 +291,19 @@ impl Flash {
             if (data[1] & 0x01) == 0 {
                 if count < 2 {
                     count += 1;
-                    if verbose {
+                    if self.verbose {
                         print!("r");
                         //fflush(stderr);
                     }
                 } else {
-                    if verbose {
+                    if self.verbose {
                         print!("R");
                         // fflush(stderr);
                     }
                     break;
                 }
             } else {
-                if verbose {
+                if self.verbose {
                     print!(".");
                     // fflush(stderr);
                 }
@@ -308,15 +313,15 @@ impl Flash {
             sleep(Duration::from_micros(1_000));
         }
 
-        if verbose {
+        if self.verbose {
             println!();
         }
 
         Ok(())
     }
 
-    pub fn prog(&mut self, addr: usize, data: &[u8], verbose: bool) -> Result<(), Error> {
-        if verbose {
+    pub fn prog(&mut self, addr: usize, data: &[u8]) -> Result<(), Error> {
+        if self.verbose {
             println!("prog 0x{:06X} +0x{:03X}..", addr, data.len());
         }
 
@@ -339,8 +344,8 @@ impl Flash {
         Ok(())
     }
 
-    pub fn read(&mut self, addr: usize, data: &mut [u8], verbose: bool) -> Result<(), Error> {
-        if verbose {
+    pub fn read(&mut self, addr: usize, data: &mut [u8]) -> Result<(), Error> {
+        if self.verbose {
             println!("read 0x{:06X} +0x{:03X}..", addr, data.len());
         }
 
