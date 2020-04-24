@@ -57,10 +57,10 @@ fn main() -> Result<(), ftdi_vcp_rs::Error> {
 
     let mut bitstream = vec![];
 
-    let matches = App::new("iCE40 Programmer")
-        .version("1.0")
+    let matches = App::new("SWOT: the Spi Write Out Tool")
+        .version(crate_version!())
         .author("Sean Cross <sean@xobs.io>")
-        .about("Port of Iceprog")
+        .about("Read and write SPI devices using an FTDI cable")
         .arg(
             Arg::with_name("FILENAME")
                 .help("Sets the bitstream file to read or write")
