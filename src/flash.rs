@@ -1,4 +1,4 @@
-use ftdi_vcp_rs::{mpsse::Command::*, BitMode, Error, VCP};
+use ftdi_vcp_rs::{Error, VCP};
 use std::thread::sleep;
 use std::time::Duration;
 

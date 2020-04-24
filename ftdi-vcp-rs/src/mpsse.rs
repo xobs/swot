@@ -50,55 +50,81 @@ pub enum Command {
 
     /// Read Data bits LowByte
     MC_READB_LOW,
+
     /// Set Data bits HighByte
     MC_SETB_HIGH,
+
     /// Read data bits HighByte
     MC_READB_HIGH,
+
     /// Enable loopback
     MC_LOOPBACK_EN,
+
     /// Disable loopback
     MC_LOOPBACK_DIS,
+
     /// Set clock divisor
     MC_SET_CLK_DIV,
+
     /// Flush buffer fifos to the PC.
     MC_FLUSH,
+
     /// Wait on GPIOL1 to go high.
     MC_WAIT_H,
+
     /// Wait on GPIOL1 to go low.
     MC_WAIT_L,
+
     /// Disable /5 div, enables 60MHz master clock
     MC_TCK_X5,
+
     /// Enable /5 div, backward compat to FT2232D
     MC_TCK_D5,
+
     /// Enable 3 phase clk, DDR I2C
     MC_EN_3PH_CLK,
+
     /// Disable 3 phase clk
     MC_DIS_3PH_CLK,
+
     /// Clock every bit, used for JTAG
     MC_CLK_N,
+
     /// Clock every byte, used for JTAG
     MC_CLK_N8,
+
     /// Clock until GPIOL1 goes high
     MC_CLK_TO_H,
+
     /// Clock until GPIOL1 goes low
     MC_CLK_TO_L,
+
     /// Enable adaptive clocking
     MC_EN_ADPT_CLK,
+
     /// Disable adaptive clocking
     MC_DIS_ADPT_CLK,
+
     /// Clock until GPIOL1 goes high, count bytes
     MC_CLK8_TO_H,
+
     /// Clock until GPIOL1 goes low, count bytes
     MC_CLK8_TO_L,
+
     /// Set IO to only drive on 0 and tristate on 1
     MC_TRI,
+
     /// CPU mode commands
+
     /// CPUMode read short address
     MC_CPU_RS,
+
     /// CPUMode read extended address
     MC_CPU_RE,
+
     /// CPUMode write short address
     MC_CPU_WS,
+
     /// CPUMode write extended address
     MC_CPU_WE,
 }
