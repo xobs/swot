@@ -7,8 +7,6 @@ license = "Apache-2"
 
 [dependencies]
 ftdi-vcp-rs = { path = "ftdi-vcp-rs" }
-clap = "2.33"
-libc = "*"
 
 [build-dependencies]
 cc = { version = "1", features = ["parallel"] }

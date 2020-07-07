@@ -1,7 +1,8 @@
 use ftdi_vcp_sys::{
-    FT_Close, FT_GetBitMode, FT_GetComPortNumber, FT_GetLatencyTimer, FT_OpenEx, FT_Purge, FT_Read,
-    FT_ResetDevice, FT_SetBitMode, FT_SetLatencyTimer, FT_Write, DWORD, FT_HANDLE,
-    FT_OPEN_BY_DESCRIPTION, FT_STATUS, LONG, LPDWORD, LPVOID, PVOID, UCHAR,
+    get_device_info_list, FT_Close, FT_GetBitMode, FT_GetComPortNumber, FT_GetLatencyTimer,
+    FT_Open, FT_OpenEx, FT_Purge, FT_Read, FT_ResetDevice, FT_SetBitMode, FT_SetLatencyTimer,
+    FT_Write, DWORD, FT_HANDLE, FT_OPEN_BY_DESCRIPTION, FT_STATUS, LONG, LPDWORD, LPVOID, PVOID,
+    UCHAR,
 };
 use std::convert::TryInto;
 use std::ffi::CString;
@@ -129,6 +130,14 @@ pub struct VCP {
     bit_mode: BitMode,
 }
 
+#[derive(Copy, Clone)]
+pub enum Interface {
+    A,
+    B,
+    C,
+    D,
+}
+
 impl VCP {
     pub fn new_from_name(name: &str) -> Result<VCP, Error> {
         let c_str = CString::new(name).or(Err(Error::StringContainsNullByte))?;
@@ -140,6 +149,55 @@ impl VCP {
                 handle.as_mut_ptr(),
             )
         });
+        if result != Error::NoError {
+            return Err(result);
+        }
+        let handle = unsafe { handle.assume_init() };
+
+        let mut bit_mode = MaybeUninit::<UCHAR>::uninit();
+        let result = Error::from(unsafe { FT_GetBitMode(handle, bit_mode.as_mut_ptr()) });
+        if result != Error::NoError {
+            unsafe { FT_Close(handle) };
+            return Err(result);
+        }
+        let bit_mode = BitMode::from(unsafe { bit_mode.assume_init() });
+        Ok(VCP { handle, bit_mode })
+    }
+
+    pub fn new_from_vid_pid(
+        vid: u16,
+        pid: u16,
+        interface: Option<Interface>,
+    ) -> Result<VCP, Error> {
+        let target_id = (vid as u32) << 16 | pid as u32;
+
+        let mut discovered_idx = None;
+        for (idx, entry) in get_device_info_list()
+            .map_err(|e| Error::from(e as FT_STATUS))?
+            .iter()
+            .enumerate()
+        {
+            if entry.ID == target_id
+                && match interface {
+                    Some(Interface::A) => entry.LocId & 0xff == 0x21,
+                    Some(Interface::B) => entry.LocId & 0xff == 0x22,
+                    Some(Interface::C) => entry.LocId & 0xff == 0x23,
+                    Some(Interface::D) => entry.LocId & 0xff == 0x24,
+                    None => true,
+                }
+            {
+                discovered_idx = Some(idx);
+                break;
+            }
+        }
+
+        if discovered_idx.is_none() {
+            return Err(Error::DeviceNotFound);
+        }
+        let discovered_idx = discovered_idx.unwrap();
+
+        let mut handle = MaybeUninit::<FT_HANDLE>::uninit();
+        let result = Error::from(unsafe { FT_Open(discovered_idx as _, handle.as_mut_ptr()) });
         if result != Error::NoError {
             return Err(result);
         }
@@ -324,6 +382,18 @@ impl VCP {
         self.write_all(buffer).or_else(|_| Err(Error::IoError))?;
         self.write_all(data).or_else(|_| Err(Error::IoError))?;
         Ok(())
+    }
+
+    pub fn send_dummy_bytes(&mut self, n: u8) -> Result<(), Error> {
+        // add 8 x count dummy bits (aka n bytes)
+        self.write_all(&[mpsse::Command::MC_CLK_N8.to_u8(), n - 1, 0x00])
+            .or_else(|_| Err(Error::IoError))
+    }
+
+    pub fn send_dummy_bit(&mut self) -> Result<(), Error> {
+        // add 1  dummy bit
+        self.write_all(&[mpsse::Command::MC_CLK_N.to_u8(), 0x00])
+            .or_else(|_| Err(Error::IoError))
     }
 }
 

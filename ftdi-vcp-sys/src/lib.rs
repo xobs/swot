@@ -14,13 +14,13 @@ pub type FT_STATUS = ULONG;
 #[repr(C)]
 #[derive(Clone)]
 pub struct FT_DEVICE_LIST_INFO_NODE {
-    Flags: ULONG,
-    Type: ULONG,
-    ID: ULONG,
-    LocId: DWORD,
-    SerialNumber: [u8; 16],
-    Description: [u8; 64],
-    ftHandle: FT_HANDLE,
+    pub Flags: ULONG,
+    pub Type: ULONG,
+    pub ID: ULONG,
+    pub LocId: DWORD,
+    pub SerialNumber: [u8; 16],
+    pub Description: [u8; 64],
+    pub ftHandle: FT_HANDLE,
 }
 
 #[repr(C)]
@@ -68,7 +68,7 @@ pub const FT_LIST_NUMBER_ONLY: DWORD = 0x8000_0000;
 pub const FT_LIST_BY_INDEX: DWORD = 0x4000_0000;
 pub const FT_LIST_ALL: DWORD = 0x2000_0000;
 
-pub const FT_LIST_MASK: DWORD = (FT_LIST_NUMBER_ONLY | FT_LIST_BY_INDEX | FT_LIST_ALL);
+pub const FT_LIST_MASK: DWORD = FT_LIST_NUMBER_ONLY | FT_LIST_BY_INDEX | FT_LIST_ALL;
 
 #[link(name = "ftd2xx")]
 #[allow(non_snake_case)]
