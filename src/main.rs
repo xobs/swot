@@ -14,6 +14,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 mod flash;
+mod mpsse_glue;
 
 fn parse_size(input: &str) -> Result<usize, &'static str> {
     let multiple_index = input
@@ -30,8 +31,8 @@ fn parse_size(input: &str) -> Result<usize, &'static str> {
         "g" | "gib" => 1024 * 1024 * 1024,
         x => {
             println!("Unrecognized suffix {}", x);
-            return Err("unrecognized suffix")
-        },
+            return Err("unrecognized suffix");
+        }
     };
     Ok(value * multiple)
 }
@@ -45,18 +46,40 @@ fn parse_size_sanity() {
     assert_eq!(parse_size("1 K").unwrap(), 1024);
     assert_eq!(parse_size("1 k").unwrap(), 1024);
     assert_eq!(parse_size("1 kiB").unwrap(), 1024);
-    assert_eq!(parse_size("1 M").unwrap(), 1024*1024);
-    assert_eq!(parse_size("2 M").unwrap(), 1024*1024*2);
+    assert_eq!(parse_size("1 M").unwrap(), 1024 * 1024);
+    assert_eq!(parse_size("2 M").unwrap(), 1024 * 1024 * 2);
+}
+
+use libc::{c_char, c_int};
+use std::ffi::CString;
+extern "C" {
+    fn iceprog_main(argc: c_int, argv: *const *const c_char) -> c_int;
 }
 
 fn main() -> Result<(), ftdi_vcp_rs::Error> {
-    let mut vcp = VCP::new_from_name("iCEBreaker V1.0e A").expect("couldn't open vcp");
     let slow_clock = false;
     let disable_verify = false;
     let disable_protect = false;
 
     let mut bitstream = vec![];
 
+    // create a vector of zero terminated strings
+    let args = std::env::args()
+        .map(|arg| CString::new(arg).unwrap())
+        .collect::<Vec<CString>>();
+    // convert the strings to raw pointers
+    let c_args = args
+        .iter()
+        .map(|arg| arg.as_ptr())
+        .collect::<Vec<*const c_char>>();
+
+    println!("Calling iceprog_main()");
+    let result = unsafe {
+        iceprog_main(c_args.len() as c_int, c_args.as_ptr())
+    };
+    println!("Returned from iceprog_main(): {}", result);
+
+    let mut vcp = VCP::new_from_name("iCEBreaker V1.0e A").expect("couldn't open vcp");
     let matches = App::new("SWOT: the Spi Write Out Tool")
         .version(clap::crate_version!())
         .author("Sean Cross <sean@xobs.io>")
@@ -122,12 +145,12 @@ fn main() -> Result<(), ftdi_vcp_rs::Error> {
     let bulk_erase = matches.is_present("bulk_erase");
     let check_mode = matches.is_present("check_mode");
     let dont_erase = matches.is_present("no_erase");
-    let rw_offset = matches.value_of("offset").map_or(0, |e: &str| {
-        parse_size(e).expect("unable to parse size")
-    });
-    let erase_size = matches.value_of("erase_size").map(|e| {
-        Some(parse_size(e).unwrap())
-    });
+    let rw_offset = matches
+        .value_of("offset")
+        .map_or(0, |e: &str| parse_size(e).expect("unable to parse size"));
+    let erase_size = matches
+        .value_of("erase_size")
+        .map(|e| Some(parse_size(e).unwrap()));
     let read_size = if matches.is_present("read_256") {
         Some(256 * 1024)
     } else if let Some(size) = matches.value_of("read_file") {
@@ -259,7 +282,8 @@ fn main() -> Result<(), ftdi_vcp_rs::Error> {
                     flash.wait()?;
                 }
                 /* seek to the beginning for second pass */
-                bitstream_file.as_mut()
+                bitstream_file
+                    .as_mut()
                     .expect("no bitstream file was specified")
                     .seek(std::io::SeekFrom::Start(0))
                     .expect("Couldn't rewind file");
