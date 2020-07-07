@@ -58,7 +58,7 @@ fn main() -> Result<(), ftdi_vcp_rs::Error> {
     let mut bitstream = vec![];
 
     let matches = App::new("SWOT: the Spi Write Out Tool")
-        .version(crate_version!())
+        .version(clap::crate_version!())
         .author("Sean Cross <sean@xobs.io>")
         .about("Read and write SPI devices using an FTDI cable")
         .arg(
