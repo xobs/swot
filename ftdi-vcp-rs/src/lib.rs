@@ -177,12 +177,13 @@ impl VCP {
             .iter()
             .enumerate()
         {
+            // println!("Device {}: {:08x}/{:08x}", idx, entry.ID, entry.LocId);
             if entry.ID == target_id
                 && match interface {
-                    Some(Interface::A) => entry.LocId & 0xff == 0x21,
-                    Some(Interface::B) => entry.LocId & 0xff == 0x22,
-                    Some(Interface::C) => entry.LocId & 0xff == 0x23,
-                    Some(Interface::D) => entry.LocId & 0xff == 0x24,
+                    Some(Interface::A) => entry.LocId & 0xf == 0x1,
+                    Some(Interface::B) => entry.LocId & 0xf == 0x2,
+                    Some(Interface::C) => entry.LocId & 0xf == 0x3,
+                    Some(Interface::D) => entry.LocId & 0xf == 0x4,
                     None => true,
                 }
             {
